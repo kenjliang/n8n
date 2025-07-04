@@ -1,4 +1,4 @@
-FROM node:18-bullseye
+FROM node:22.17-bullseye
 
 # Set shell so pnpm install script doesn’t fail
 ENV SHELL=/bin/bash
