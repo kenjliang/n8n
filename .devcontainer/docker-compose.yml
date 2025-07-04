@@ -1,3 +1,5 @@
+version: "3.8"
+
 volumes:
   postgres-data:
 
@@ -8,17 +10,28 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=n8n
-      - POSTGRES_PASSWORD=password
+      POSTGRES_DB: n8n
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
 
   n8n:
     build:
       context: .
       dockerfile: Dockerfile
+    working_dir: /workspaces/n8n
+    user: node
+    command: sh -c "tail -f /dev/null"
+    depends_on:
+      - postgres
     volumes:
       - ..:/workspaces:cached
-    command: sleep infinity
     environment:
-      DB_POSTGRESDB_HOST: postgres
       DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: postgres
       DB_POSTGRESDB_PASSWORD: password
+      N8N_HOST: 0.0.0.0
+      N8N_PORT: 5678
+      WEBHOOK_URL: "https://${CODESPACE_NAME}-5678.app.github.dev"

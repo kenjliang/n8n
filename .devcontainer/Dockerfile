@@ -1,7 +1,18 @@
-FROM n8nio/base:22
+FROM node:18-bullseye
 
-RUN apk add --no-cache --update openssh sudo shadow bash
-RUN echo node ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/node && chmod 0440 /etc/sudoers.d/node
-RUN mkdir /workspaces && chown node:node /workspaces
+# Install system tools
+RUN apt-get update && apt-get install -y \
+    openssh-client sudo curl git bash && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add non-root user
+RUN useradd -ms /bin/bash node && \
+    echo "node ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/node
+
 USER node
-RUN mkdir -p ~/.pnpm-store && pnpm config set store-dir ~/.pnpm-store --global
+WORKDIR /workspaces/n8n
+
+# Install pnpm
+RUN curl -fsSL https://get.pnpm.io/install.sh | sh -
+
+ENV PATH="/home/node/.local/share/pnpm:$PATH"
