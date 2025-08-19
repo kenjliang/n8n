@@ -1,10 +1,11 @@
 import { DateTime, Duration, Interval } from 'luxon';
 
-import { ApplicationError } from './errors/application.error';
+import { ApplicationError } from '@n8n/errors';
 import { ExpressionExtensionError } from './errors/expression-extension.error';
 import { ExpressionError } from './errors/expression.error';
 import { evaluateExpression, setErrorHandler } from './expression-evaluator-proxy';
 import { sanitizer, sanitizerName } from './expression-sandboxing';
+import { isExpression } from './expressions/expression-helpers';
 import { extend, extendOptional } from './extensions';
 import { extendSyntax } from './extensions/expression-extension';
 import { extendedFunctions } from './extensions/extended-functions';
@@ -25,7 +26,6 @@ import type {
 } from './interfaces';
 import type { Workflow } from './workflow';
 import { WorkflowDataProxy } from './workflow-data-proxy';
-import { isExpression } from './expressions/expression-helpers';
 
 const IS_FRONTEND_IN_DEV_MODE =
 	typeof process === 'object' &&

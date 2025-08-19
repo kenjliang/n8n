@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import {
-	NodeConnectionTypes,
-	type IRunData,
-	type IRunExecutionData,
-	type Workflow,
-} from 'n8n-workflow';
+import { NodeConnectionTypes, type IRunData, type Workflow } from 'n8n-workflow';
 import RunData from './RunData.vue';
 import RunInfo from './RunInfo.vue';
 import { storeToRefs } from 'pinia';
@@ -25,6 +20,8 @@ import { CanvasNodeDirtiness } from '@/types';
 import { NDV_UI_OVERHAUL_EXPERIMENT } from '@/constants';
 import { usePostHog } from '@/stores/posthog.store';
 import { type IRunDataDisplayMode } from '@/Interface';
+import { I18nT } from 'vue-i18n';
+import { useExecutionData } from '@/composables/useExecutionData';
 
 // Types
 
@@ -40,7 +37,7 @@ type OutputTypeKey = keyof typeof OUTPUT_TYPE;
 type OutputType = (typeof OUTPUT_TYPE)[OutputTypeKey];
 
 type Props = {
-	workflow: Workflow;
+	workflowObject: Workflow;
 	runIndex: number;
 	isReadOnly?: boolean;
 	linkedRuns?: boolean;
@@ -103,12 +100,14 @@ const outputTypes = ref([
 	{ label: i18n.baseText('ndv.output.outType.logs'), value: OUTPUT_TYPE.LOGS },
 ]);
 const runDataRef = ref<RunDataRef>();
+const collapsingColumnName = ref<string | null>(null);
 
 // Computed
 
 const node = computed(() => {
 	return ndvStore.activeNode ?? undefined;
 });
+const { hasNodeRun, workflowExecution, workflowRunData } = useExecutionData({ node });
 
 const isTriggerNode = computed(() => {
 	return !!node.value && nodeTypesStore.isTriggerNode(node.value.type);
@@ -120,7 +119,7 @@ const hasAiMetadata = computed(() => {
 	}
 
 	if (node.value) {
-		const connectedSubNodes = props.workflow.getParentNodes(node.value.name, 'ALL_NON_MAIN');
+		const connectedSubNodes = props.workflowObject.getParentNodes(node.value.name, 'ALL_NON_MAIN');
 		const resultData = connectedSubNodes.map(workflowsStore.getWorkflowResultDataByNodeName);
 
 		return resultData && Array.isArray(resultData) && resultData.length > 0;
@@ -146,29 +145,6 @@ const isNodeRunning = computed(() => {
 });
 
 const workflowRunning = computed(() => workflowsStore.isWorkflowRunning);
-
-const workflowExecution = computed(() => {
-	return workflowsStore.getWorkflowExecution;
-});
-
-const workflowRunData = computed(() => {
-	if (workflowExecution.value === null) {
-		return null;
-	}
-	const executionData: IRunExecutionData | undefined = workflowExecution.value.data;
-	if (!executionData?.resultData?.runData) {
-		return null;
-	}
-	return executionData.resultData.runData;
-});
-
-const hasNodeRun = computed(() => {
-	if (workflowsStore.subWorkflowExecutionError) return true;
-
-	return Boolean(
-		node.value && workflowRunData.value && workflowRunData.value.hasOwnProperty(node.value.name),
-	);
-});
 
 const runTaskData = computed(() => {
 	if (!node.value || workflowExecution.value === null) {
@@ -239,7 +215,7 @@ const allToolsWereUnusedNotice = computed(() => {
 	// as it likely ends up unactionable noise to the user
 	if (pinnedData.hasData.value) return undefined;
 
-	const toolsAvailable = props.workflow.getParentNodes(
+	const toolsAvailable = props.workflowObject.getParentNodes(
 		node.value.name,
 		NodeConnectionTypes.AiTool,
 		1,
@@ -321,14 +297,18 @@ watch(defaultOutputMode, (newValue: OutputType, oldValue: OutputType) => {
 const activatePane = () => {
 	emit('activatePane');
 };
+
+function handleChangeCollapsingColumn(columnName: string | null) {
+	collapsingColumnName.value = columnName;
+}
 </script>
 
 <template>
 	<RunData
 		ref="runDataRef"
-		:class="$style.runData"
+		:class="[$style.runData, { [$style.runDataV2]: isNDVV2 }]"
 		:node="node"
-		:workflow="workflow"
+		:workflow-object="workflowObject"
 		:run-index="runIndex"
 		:linked-runs="linkedRuns"
 		:can-link-runs="canLinkRuns"
@@ -346,6 +326,7 @@ const activatePane = () => {
 		:callout-message="allToolsWereUnusedNotice"
 		:display-mode="displayMode"
 		:disable-ai-content="true"
+		:collapsing-table-column-name="collapsingColumnName"
 		data-test-id="ndv-output-panel"
 		@activate-pane="activatePane"
 		@run-change="onRunIndexChange"
@@ -355,6 +336,7 @@ const activatePane = () => {
 		@item-hover="emit('itemHover', $event)"
 		@search="emit('search', $event)"
 		@display-mode-change="emit('displayModeChange', $event)"
+		@collapsing-table-column-changed="handleChangeCollapsingColumn"
 	>
 		<template #header>
 			<div :class="[$style.titleSection, { [$style.titleSectionV2]: isNDVV2 }]">
@@ -405,13 +387,14 @@ const activatePane = () => {
 						<N8nIcon icon="arrow-right-from-line" size="xlarge" />
 					</template>
 					<template #description>
-						<i18n-t
+						<I18nT
 							tag="span"
 							:keypath="
 								isSubNodeType
 									? 'ndv.output.runNodeHintSubNode'
 									: 'ndv.output.noOutputData.v2.description'
 							"
+							scope="global"
 						>
 							<template #link>
 								<NodeExecuteButton
@@ -431,7 +414,7 @@ const activatePane = () => {
 								/>
 								<br />
 							</template>
-						</i18n-t>
+						</I18nT>
 					</template>
 				</NDVEmptyState>
 			</template>
@@ -477,7 +460,7 @@ const activatePane = () => {
 		</template>
 
 		<template v-if="outputMode === 'logs' && node" #content>
-			<RunDataAi :node="node" :run-index="runIndex" :workflow="workflow" />
+			<RunDataAi :node="node" :run-index="runIndex" :workflow-object="workflowObject" />
 		</template>
 
 		<template #recovered-artificial-output-data>
@@ -506,6 +489,10 @@ const activatePane = () => {
 }
 .runData {
 	background-color: var(--color-run-data-background);
+}
+
+.runDataV2 {
+	background-color: var(--color-ndvv2-run-data-background);
 }
 .outputTypeSelect {
 	margin-bottom: var(--spacing-4xs);
