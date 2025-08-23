@@ -3,7 +3,6 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "n8n",
   "workspaceFolder": "/workspaces/n8n",
-  "forwardPorts": [5678],
   "containerEnv": {
     "CODESPACE_NAME": "${localEnv:CODESPACE_NAME}"
   },

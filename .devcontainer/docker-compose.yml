@@ -32,6 +32,7 @@ services:
       DB_POSTGRESDB_DATABASE: n8n
       DB_POSTGRESDB_USER: postgres
       DB_POSTGRESDB_PASSWORD: password
+      N8N_UNSAFE_PACKAGES: true
       N8N_HOST: 0.0.0.0
       N8N_PORT: 5678
       WEBHOOK_URL: "https://${CODESPACE_NAME}-5678.app.github.dev"
